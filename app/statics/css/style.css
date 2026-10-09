@@ -1,0 +1,242 @@
+:root {
+  --tyb-bg: #f4f6fa;
+  --tyb-card: #ffffff;
+  --tyb-border: #e2e6ee;
+  --tyb-primary: #3b5bdb;
+  --tyb-accent: #f59f00;
+  --tyb-code-bg: #1e1e2e;
+  --tyb-code-fg: #e6e6ef;
+  --tyb-success: #2f9e44;
+  --tyb-danger: #e03131;
+}
+
+/* ---------------------------------------------------------------------
+   Global
+   --------------------------------------------------------------------- */
+body {
+  background: var(--tyb-bg);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  color: #1a1d24;
+}
+
+/* ---------------------------------------------------------------------
+   Header
+   --------------------------------------------------------------------- */
+.tyb-header {
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.tyb-header h1 {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.tyb-header .text-muted {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.tyb-header #coin-balance {
+  color: #ffd43b;
+}
+
+.tyb-header #status-badge {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: background 0.2s ease;
+}
+
+/* Status badge states — toggled by app.js via class names */
+#status-badge.is-training {
+  background: var(--tyb-accent) !important;
+  color: #1a1d24 !important;
+}
+#status-badge.is-success {
+  background: var(--tyb-success) !important;
+  color: #fff !important;
+}
+#status-badge.is-error {
+  background: var(--tyb-danger) !important;
+  color: #fff !important;
+}
+
+/* ---------------------------------------------------------------------
+   Cards
+   --------------------------------------------------------------------- */
+.tyb-card {
+  background: var(--tyb-card);
+  border: 1px solid var(--tyb-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.tyb-card .card-body {
+  padding: 1.25rem;
+}
+
+/* ---------------------------------------------------------------------
+   Cost breakdown
+   --------------------------------------------------------------------- */
+#cost-breakdown .list-group-item {
+  padding: 0.4rem 0.75rem;
+  border-left: none;
+  border-right: none;
+  background: transparent;
+}
+
+#cost-breakdown .list-group-item:first-child {
+  border-top: none;
+}
+#cost-breakdown .list-group-item:last-child {
+  border-bottom: none;
+}
+
+#cost-breakdown .cost-label {
+  font-size: 0.9rem;
+}
+#cost-breakdown .cost-detail {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+#cost-breakdown .cost-coins {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------
+   Code panel
+   --------------------------------------------------------------------- */
+.tyb-code {
+  background: var(--tyb-code-bg);
+  color: var(--tyb-code-fg);
+  border-radius: 8px;
+  padding: 1rem;
+  font-family:
+    "JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  overflow: auto;
+  max-height: 70vh;
+  white-space: pre;
+  tab-size: 4;
+}
+
+.tyb-code code {
+  color: inherit;
+  background: transparent;
+}
+
+/* Thin scrollbar for the code panel and history table */
+.tyb-code::-webkit-scrollbar,
+.tyb-history::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.tyb-code::-webkit-scrollbar-thumb,
+.tyb-history::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+}
+
+/* ---------------------------------------------------------------------
+   Results
+   --------------------------------------------------------------------- */
+#results-body td:first-child {
+  width: 45%;
+  color: #4b5563;
+}
+#results-body td:last-child {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+#mission-banner.alert-success {
+  background: #ebfbee;
+  border-color: #b2f2bb;
+  color: #2b8a3e;
+}
+#mission-banner.alert-warning {
+  background: #fff9db;
+  border-color: #ffe066;
+  color: #a26b00;
+}
+
+/* ---------------------------------------------------------------------
+   History table
+   --------------------------------------------------------------------- */
+.tyb-history {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--tyb-border);
+  border-radius: 8px;
+}
+
+.tyb-history table {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+}
+
+.tyb-history thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8f9fc;
+  border-bottom: 1px solid var(--tyb-border);
+}
+
+/* ---------------------------------------------------------------------
+   Charts
+   --------------------------------------------------------------------- */
+#chart-accuracy,
+#chart-loss {
+  max-height: 260px;
+}
+
+/* ---------------------------------------------------------------------
+   Buttons
+   --------------------------------------------------------------------- */
+#train-btn {
+  background: var(--tyb-primary);
+  border-color: var(--tyb-primary);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+#train-btn:hover:not(:disabled) {
+  background: #2f4ec0;
+  border-color: #2f4ec0;
+}
+#train-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------------
+   Responsive
+   --------------------------------------------------------------------- */
+@media (max-width: 991.98px) {
+  .tyb-code {
+    max-height: 40vh;
+    font-size: 0.78rem;
+  }
+  .tyb-header h1 {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .tyb-card .card-body {
+    padding: 1rem;
+  }
+  #cost-breakdown .cost-detail {
+    display: none;
+  } /* too noisy on phones */
+}
