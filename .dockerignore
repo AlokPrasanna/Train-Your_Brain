@@ -1,0 +1,41 @@
+# Virtual environment — the container has its own Python
+
+.venv/
+venv/
+env/
+
+# Secrets — must NEVER be baked into an image
+
+.env
+.env.\*
+
+# Python caches
+
+**pycache**/
+_.py[cod]
+_.egg-info/
+.pytest_cache/
+
+# Git
+
+.git/
+.gitignore
+
+# IDE / OS
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated / dev-only files
+
+experiment_results.csv
+scan.py
+experiment.py
+\*.log
+
+# Local docs (safe to exclude from the image)
+
+README.md
+\*.pptx
