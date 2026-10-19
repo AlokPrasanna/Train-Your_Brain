@@ -44,15 +44,18 @@ def dataset_info(path: str | None = None) -> dict:
     target = df[Config.TARGET_COLUMN]
 
     return {
-        "path": path or Config.DATASET_PATH,
-        "rows": int(df.shape[0]),
-        "features": Config.FEATURE_COLUMNS,
-        "target": Config.TARGET_COLUMN,
-        "class_distribution": {
-            "class_0": int((target == 0).sum()),
-            "class_1": int((target == 1).sum()),
-        },
-        "preview": df.head(5).to_dict(orient="records"),
+    "path": path or Config.DATASET_PATH,
+    "rows": int(df.shape[0]),
+    "features": Config.FEATURE_COLUMNS,
+    "target": Config.TARGET_COLUMN,
+    "class_distribution": {
+        "class_0": int((target == 0).sum()),
+        "class_1": int((target == 1).sum()),
+    },
+    "preview": df.head(5).to_dict(orient="records"),
+    # Difficulty info
+    "label_noise_fraction": Config.LABEL_NOISE_FRACTION,
+    "accuracy_ceiling_estimate": round(1 - Config.LABEL_NOISE_FRACTION, 3),
     }
 
 
@@ -69,6 +72,27 @@ def parse_split_ratio(split_ratio: str) -> float:
     train_part, _test_part = split_ratio.split(":")
     return int(train_part) / 100.0
 
+def _add_label_noise(y: np.ndarray, fraction: float, seed: int) -> np.ndarray:
+    """
+    Randomly flip a fraction of labels to make the task realistic.
+
+    The flipped-label samples have a target that no longer matches
+    their features, so no model can predict them correctly. This caps
+    achievable accuracy at roughly (1 - fraction) and turns the
+    workshop into a real optimization game instead of a solved one.
+
+    Deterministic given (fraction, seed) so every team sees the same
+    noise for fair comparison.
+    """
+    if fraction <= 0:
+        return y
+    rng = np.random.default_rng(seed)
+    n_flip = int(round(len(y) * fraction))
+    flip_idx = rng.choice(len(y), size=n_flip, replace=False)
+    y = y.copy()
+    y[flip_idx] = 1.0 - y[flip_idx]
+    return y
+
 
 def prepare_datasets(split_ratio: str = None):
     
@@ -78,6 +102,14 @@ def prepare_datasets(split_ratio: str = None):
     df = load_dataframe()
     X = df[Config.FEATURE_COLUMNS].to_numpy(dtype=np.float32)
     y = df[Config.TARGET_COLUMN].to_numpy(dtype=np.float32)
+
+    # Inject label noise BEFORE the split so train / val / test all
+    # see the same noisy distribution.
+    y = _add_label_noise(
+        y,
+        Config.LABEL_NOISE_FRACTION,
+        Config.RANDOM_SEED,
+    )
 
     # --- Step 2: train+val vs test -----------------------------------
     # test_size is the *test* portion of the full dataset.
@@ -126,3 +158,5 @@ def prepare_datasets(split_ratio: str = None):
         "split_summary": split_summary,
         "scaler": scaler,
     }
+
+    

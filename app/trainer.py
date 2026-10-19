@@ -162,6 +162,7 @@ def generate_code(config: dict) -> str:
     test_fraction = int(test_part) / 100.0
     val_fraction = Config.VALIDATION_FRACTION
     seed = Config.RANDOM_SEED
+    noise_fraction = Config.LABEL_NOISE_FRACTION
 
     # --- Build the hidden-layer lines ---
     hidden_lines = []
@@ -197,6 +198,17 @@ df = pd.read_csv("data/data_banknote_authentication.txt", header=None, names=col
 
 X = df[["variance", "skewness", "curtosis", "entropy"]].to_numpy(dtype=np.float32)
 y = df["class"].to_numpy(dtype=np.float32)
+
+# --- Inject label noise so the task is not trivially solvable -----
+# This is the same preprocessing the workshop server performs.
+# {int(noise_fraction*100)}% of labels are randomly flipped, capping
+# the achievable accuracy at roughly {round((1-noise_fraction)*100)}%.
+NOISE_FRACTION = {noise_fraction}
+if NOISE_FRACTION > 0:
+    rng = np.random.default_rng(SEED)
+    n_flip = int(round(len(y) * NOISE_FRACTION))
+    flip_idx = rng.choice(len(y), size=n_flip, replace=False)
+    y[flip_idx] = 1.0 - y[flip_idx]
 
 # --- 2. Split: train+val vs test ---------------------------------
 # Selected split ratio: {split_ratio}  (test = {test_part}%)

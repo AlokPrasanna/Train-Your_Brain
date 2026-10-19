@@ -455,6 +455,8 @@ async function loadDatasetInfo() {
 
     const d = data.dataset;
     el.datasetPath.textContent = d.path;
+    const noisePct = Math.round((d.label_noise_fraction || 0) * 100);
+    const ceilingPct = Math.round((d.accuracy_ceiling_estimate || 1) * 100);
     el.datasetInfo.innerHTML = `
       <div class="col-sm-4"><div class="text-muted small">Rows</div>
         <div class="fw-semibold">${d.rows}</div></div>
@@ -494,18 +496,280 @@ function wireEvents() {
 
 async function init() {
   cacheDom();
+
   try {
     await loadConfig();
   } catch (err) {
     showError("Could not load application configuration: " + err.message);
     return;
   }
+
   wireEvents();
+
+  // Wire Part B interactions.
+  el.trainBtn.addEventListener("click", train);
+  el.resetConfirmBtn.addEventListener("click", resetCoins);
+  el.resetCodeInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      resetCoins();
+    }
+  });
+  // Clear reset error each time the modal opens.
+  $("resetModal").addEventListener("show.bs.modal", () => {
+    el.resetError.classList.add("d-none");
+    el.resetError.textContent = "";
+    el.resetCodeInput.value = "";
+    el.resetCodeInput.focus();
+  });
+
+  // Charts must be created before the results card is shown.
+  initCharts();
+
   await Promise.all([loadDatasetInfo(), refreshCostAndCode()]);
   setStatus("idle", "Idle");
 
-  // Part B will hook the train button and reset modal here.
-  console.log("[Train Your Brain] Part A ready.");
+  console.log("[Train Your Brain] Ready.");
 }
 
 document.addEventListener("DOMContentLoaded", init);
+
+document.addEventListener("DOMContentLoaded", init);
+
+/* ---------------------------------------------------------------------
+   13. Charts — created once, updated on every training run
+   --------------------------------------------------------------------- */
+
+let accuracyChart = null;
+let lossChart = null;
+
+function initCharts() {
+  const commonOptions = (yLabel) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { position: "bottom" },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `${ctx.dataset.label}: ${fmt(ctx.parsed.y, 4)}`,
+        },
+      },
+    },
+    scales: {
+      x: { title: { display: true, text: "Epoch" } },
+      y: { title: { display: true, text: yLabel }, beginAtZero: true },
+    },
+  });
+
+  accuracyChart = new Chart($("chart-accuracy"), {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: "Train",
+          data: [],
+          borderColor: "#3b5bdb",
+          backgroundColor: "rgba(59,91,219,0.10)",
+          tension: 0.25,
+        },
+        {
+          label: "Validation",
+          data: [],
+          borderColor: "#f59f00",
+          backgroundColor: "rgba(245,159,0,0.10)",
+          tension: 0.25,
+        },
+      ],
+    },
+    options: commonOptions("Accuracy"),
+  });
+
+  lossChart = new Chart($("chart-loss"), {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: "Train",
+          data: [],
+          borderColor: "#3b5bdb",
+          backgroundColor: "rgba(59,91,219,0.10)",
+          tension: 0.25,
+        },
+        {
+          label: "Validation",
+          data: [],
+          borderColor: "#e03131",
+          backgroundColor: "rgba(224,49,49,0.10)",
+          tension: 0.25,
+        },
+      ],
+    },
+    options: commonOptions("Loss"),
+  });
+}
+
+function updateCharts(history) {
+  const epochs = history.accuracy.map((_, i) => i + 1);
+
+  accuracyChart.data.labels = epochs;
+  accuracyChart.data.datasets[0].data = history.accuracy;
+  accuracyChart.data.datasets[1].data = history.val_accuracy;
+  accuracyChart.update();
+
+  lossChart.data.labels = epochs;
+  lossChart.data.datasets[0].data = history.loss;
+  lossChart.data.datasets[1].data = history.val_loss;
+  lossChart.update();
+}
+
+/* ---------------------------------------------------------------------
+   14. Results rendering
+   --------------------------------------------------------------------- */
+
+function renderResults(payload) {
+  const { result, cost, balance } = payload;
+  const m = result.metrics;
+
+  // --- Metric rows ---
+  const rows = [
+    ["Final training accuracy", pct(m.train_accuracy)],
+    ["Final validation accuracy", pct(m.val_accuracy)],
+    ["Test accuracy", pct(m.test_accuracy)],
+    ["Test loss", fmt(m.test_loss, 4)],
+    ["Training duration", `${fmt(result.duration_seconds, 2)} s`],
+    ["Coins spent on this run", `${cost.total}`],
+    ["Remaining coins", `${balance.remaining}`],
+    ["Split ratio used", result.split_summary.split_ratio],
+  ];
+
+  el.resultsBody.innerHTML = rows
+    .map(
+      ([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`,
+    )
+    .join("");
+
+  // --- Mission banner ---
+  const achieved = result.mission.achieved;
+  el.missionBanner.className =
+    "alert " + (achieved ? "alert-success" : "alert-warning");
+  el.missionBanner.innerHTML = achieved
+    ? `<i class="bi bi-trophy-fill"></i> <strong>Mission accomplished!</strong>
+       Validation accuracy ${pct(m.val_accuracy)} ≥ target ${pct(result.mission.target)}.`
+    : `<i class="bi bi-arrow-repeat"></i> <strong>Keep experimenting.</strong>
+       Validation accuracy ${pct(m.val_accuracy)} is below the target ${pct(result.mission.target)}.
+       Try a different architecture or more epochs — but watch your coins.`;
+
+  // --- History table ---
+  const rows2 = [];
+  const h = result.history;
+  for (let i = 0; i < h.accuracy.length; i++) {
+    rows2.push(`
+      <tr>
+        <td>${i + 1}</td>
+        <td>${pct(h.accuracy[i], 3)}</td>
+        <td>${pct(h.val_accuracy[i], 3)}</td>
+        <td>${fmt(h.loss[i], 4)}</td>
+        <td>${fmt(h.val_loss[i], 4)}</td>
+      </tr>`);
+  }
+  el.historyBody.innerHTML = rows2.join("");
+
+  // --- Charts ---
+  updateCharts(result.history);
+
+  // --- Reveal results card ---
+  el.resultsCard.classList.remove("d-none");
+}
+
+/* ---------------------------------------------------------------------
+   15. Training flow
+   --------------------------------------------------------------------- */
+
+async function train() {
+  if (state.training) return; // guard against double-clicks
+
+  state.training = true;
+  setStatus("training", "Training…");
+  el.trainBtn.disabled = true;
+  el.trainBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status"></span> Training your brain…`;
+
+  try {
+    const res = await fetch("/api/train", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...state.config, balance: state.balance }),
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      // Training failed — do NOT deduct coins.
+      setStatus("error", "Training failed");
+      showError(data.error || "Training failed. No coins were deducted.");
+      return;
+    }
+
+    // Success: update balance from server response, render everything.
+    saveBalance(data.balance.remaining);
+    renderResults(data);
+    setStatus("success", "Done");
+  } catch (err) {
+    setStatus("error", "Network error");
+    showError("Could not reach the server: " + err.message);
+  } finally {
+    state.training = false;
+    // Recompute button state and label from the (possibly updated) balance.
+    updateTrainButtonState();
+  }
+}
+
+/* ---------------------------------------------------------------------
+   16. Reset coins
+   --------------------------------------------------------------------- */
+
+async function resetCoins() {
+  const code = el.resetCodeInput.value.trim();
+  el.resetError.classList.add("d-none");
+  el.resetError.textContent = "";
+
+  if (!code) {
+    el.resetError.textContent = "Please enter the reset code.";
+    el.resetError.classList.remove("d-none");
+    return;
+  }
+
+  el.resetConfirmBtn.disabled = true;
+  el.resetConfirmBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> Resetting…`;
+
+  try {
+    const res = await fetch("/api/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      el.resetError.textContent = data.error || "Reset failed.";
+      el.resetError.classList.remove("d-none");
+      return;
+    }
+
+    saveBalance(data.balance);
+    updateTrainButtonState();
+
+    // Close the modal and clear the input.
+    const modal = bootstrap.Modal.getInstance($("resetModal"));
+    if (modal) modal.hide();
+    el.resetCodeInput.value = "";
+    setStatus("idle", "Idle");
+  } catch (err) {
+    el.resetError.textContent = "Network error: " + err.message;
+    el.resetError.classList.remove("d-none");
+  } finally {
+    el.resetConfirmBtn.disabled = false;
+    el.resetConfirmBtn.textContent = "Reset";
+  }
+}

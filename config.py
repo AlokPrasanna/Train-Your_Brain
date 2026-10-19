@@ -37,3 +37,6 @@ class Config:
 
     # Reproducibility
     RANDOM_SEED = 42
+
+    # Difficulty tuning
+    LABEL_NOISE_FRACTION = float(os.getenv("LABEL_NOISE_FRACTION", "0.15"))
